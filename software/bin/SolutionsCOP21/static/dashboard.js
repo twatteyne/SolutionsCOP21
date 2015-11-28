@@ -77,31 +77,32 @@ function initDashboard() {
         }
     );
     
-    svgText        = '<svg id="dashboardcanvas" xmlns="http://www.w3.org/2000/svg">'
+    //=== motes
+    
+    svgText        = '<svg id="motecanvas" xmlns="http://www.w3.org/2000/svg" style="z-index:2">'
     for (var mac in positions) {
-        svgText   += '<circle id="'+mac+'_circle" class="motecircle"></circle>';
+        svgText   += '<circle id="'+mac+'_circle" class="motecircle" style="z-index:3"></circle>';
     }
     svgText       += '</svg>'
     $(svgText).appendTo('#dashboard');
     
-    $('#dashboardcanvas').attr({
+    $('#motecanvas').attr({
         'width':   map_w,
         'height':  map_h
     });
-    $('#dashboardcanvas').offset(
+    $('#motecanvas').offset(
         {
             top:  map_top,
             left: map_left
         }
     );
     
-    //=== motes
     for (var mac in positions) {
         $('#'+mac+'_circle').attr({
             'cx':      positions[mac][0]*map_w,
             'cy':      positions[mac][1]*map_h
         });
-        $('<div id="'+mac+'_text" class="motetext"/>').appendTo('#dashboard');
+        $('<div id="'+mac+'_text" class="motetext" style="z-index:4"/>').appendTo('#dashboard');
         $('#'+mac+'_text').css({
             'left':     map_left+positions[mac][0]*map_w-motesize/2,
             'top':      map_top+positions[mac][1]*map_h-motesize/2
@@ -117,6 +118,9 @@ function refreshDashboard() {
    getNewDashboardData();
 }
 function refreshDashboard_cb(newData) {
+    
+    //=== motes
+    
     for (var mac in newData.temperature) {
         temperature = newData.temperature[mac][0];
         lastupdate  = newData.temperature[mac][1];
@@ -135,4 +139,31 @@ function refreshDashboard_cb(newData) {
         }
         lastupdates[mac] = lastupdate;
     }
+    
+    //=== paths
+    
+    $("#pathscanvas").remove();
+    svgText        = '<svg id="pathscanvas" xmlns="http://www.w3.org/2000/svg" style="z-index:1">'
+    for (var i=0;i<newData.paths.length;i++) {
+        source     = newData.paths[i][0];
+        dest       = newData.paths[i][1];
+        x1         = positions[source][0]*map_w
+        y1         = positions[source][1]*map_h
+        x2         = positions[dest][0]*map_w
+        y2         = positions[dest][1]*map_h
+        svgText   += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="black" stroke-width="2"/>'
+    }
+    svgText       += '</svg>'
+    $(svgText).appendTo('#dashboard');
+    
+    $('#pathscanvas').attr({
+        'width':   map_w,
+        'height':  map_h
+    });
+    $('#pathscanvas').offset(
+        {
+            top:  map_top,
+            left: map_left
+        }
+    );
 }
