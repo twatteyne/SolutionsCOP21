@@ -5,10 +5,44 @@ jQuery.ajaxSetup({ cache: false });
 
 //========== defines
 
-var safezone_cx    = 0;
-var safezone_cy    = 0;
-var safezone_r     = 0;
-var lastUpdate     = 0;
+var map_w          = 0;
+var map_h          = 0;
+var map_top        = 0;
+var map_left       = 0;
+
+/*
+  +-7-----8-+-9----10-+
+  6         |        11
+  |         |         |
+  5         |        12
+  +--------M+---------+
+  4         |        13
+  |         |         |
+  3         |        14
+  +-2-----1-+---------+
+*/
+
+var positions      = {
+    '00-17-0d-00-00-38-06-67': [0.45,0.50],      // position M
+    
+    '00-17-0d-00-00-38-06-ad': [0.40,0.89],      // position 1
+    '00-17-0d-00-00-38-05-da': [0.20,0.89],      // position 2
+    
+    '00-17-0d-00-00-33-33-33': [0.05,0.80],      // position 3
+    '00-17-0d-00-00-44-44-44': [0.05,0.60],      // position 4
+    '00-17-0d-00-00-55-55-55': [0.05,0.40],      // position 5
+    '00-17-0d-00-00-66-66-66': [0.05,0.20],      // position 6
+    
+    '00-17-0d-00-00-77-77-77': [0.20,0.13],      // position 7
+    '00-17-0d-00-00-88-88-88': [0.40,0.13],      // position 8
+    '00-17-0d-00-00-99-99-99': [0.60,0.13],      // position 9
+    '00-17-0d-00-00-aa-aa-aa': [0.80,0.13],      // position 10
+    
+    '00-17-0d-00-00-bb-bb-bb': [0.95,0.20],      // position 11
+    '00-17-0d-00-00-cc-cc-cc': [0.95,0.40],      // position 12
+    '00-17-0d-00-00-dd-dd-dd': [0.95,0.60],      // position 13
+    '00-17-0d-00-00-ee-ee-ee': [0.95,0.80]       // position 14
+}
 
 //=========================== admin ===========================================
 
@@ -16,6 +50,7 @@ function initDashboard() {
     
     //=== logo
     
+    /*
     $('\
         <div id="logo" class="logo"> \
             <img src="logo.png">\
@@ -28,50 +63,62 @@ function initDashboard() {
         }
     );
     $('#logo').css('z-index',-1);
+    */
     
-    //=== safezone
+    //=== map
     
-    safezone_cx    = $(window).width()/2;
-    safezone_cy    = $(window).height()/2;
-    safezone_r     = Math.min($(window).width(),$(window).height())/2.5;
+    if ($(window).width()>$(window).height()) {
+        map_w      = $(window).height();
+        map_h      = $(window).height();
+    } else {
+        map_w      = $(window).width();
+        map_h      = $(window).width();
+    }
+    map_top        = ($(window).height()-map_h)/2;
+    map_left       = ($(window).width()-map_w)/2;
     
     $('\
-        <svg id="dashboardcanvas" xmlns="http://www.w3.org/2000/svg">\
-            <circle id="safezone"/> \
-            <line   id="lineh" class="safezoneline" x1="0" y1="0" x2="200" y2="200"/> \
-            <line   id="linev" class="safezoneline" x1="0" y1="0" x2="200" y2="300"/> \
-            <circle id="dot"/> \
-        </svg>'
+        <img id="map" src="map.jpg">'
     ).appendTo('#dashboard');
+    $('#map').attr({
+        'width':   map_w,
+        'height':  map_h,
+    });
+    $('#map').offset(
+        {
+            top:  map_top,
+            left: map_left
+        }
+    );
+    
+    svgText        = '<svg id="dashboardcanvas" xmlns="http://www.w3.org/2000/svg">'
+    for (var mac in positions) {
+        svgText   += '<circle id="'+mac+'_circle" class="mote"></circle>';
+    }
+    svgText       += '</svg>'
+    $(svgText).appendTo('#dashboard');
+    
     $('#dashboardcanvas').attr({
-        'width':   $(window).width()-20,
-        'height':  $(window).height()-20
+        'width':   map_w,
+        'height':  map_h
     });
-    $('#safezone').attr({
-        'cx':      safezone_cx,
-        'cy':      safezone_cy,
-        'r':       safezone_r,
-        'fill':    "#c0c0c0"
-    });
-    $('#linev').attr({
-        'x1':      safezone_cx,
-        'y1':      safezone_cy-safezone_r,
-        'x2':      safezone_cx,
-        'y2':      safezone_cy+safezone_r
-    });
-    $('#lineh').attr({
-        'x1':      safezone_cx-safezone_r,
-        'y1':      safezone_cy,
-        'x2':      safezone_cx+safezone_r,
-        'y2':      safezone_cy
-    });
-    $('#dot').attr({
-        'cx':      -50,
-        'cy':      -50
-    });
-    $('#dot').css({
-        'z-index': -1
-    });
+    $('#dashboardcanvas').offset(
+        {
+            top:  map_top,
+            left: map_left
+        }
+    );
+    
+    //=== motes
+    for (var mac in positions) {
+        $('#'+mac+'_circle').attr({
+            'cx':      positions[mac][0]*map_w,
+            'cy':      positions[mac][1]*map_h
+        });
+        $('#'+mac).css({
+            'z-index': -1
+        });
+    }
 }
 
 function refreshDashboard() {
@@ -83,6 +130,7 @@ function refreshDashboard() {
 }
 function refreshDashboard_cb(newData) {
     
+    /*
     // filter cases when I don't need to update
     if (newData['calibrated']==false) {
         return;
@@ -115,7 +163,7 @@ function refreshDashboard_cb(newData) {
     } else {
         $('#safezone').attr('fill',"#5ea00f");
     }
-    
+    */
     // log
     console.log(newData);
 }

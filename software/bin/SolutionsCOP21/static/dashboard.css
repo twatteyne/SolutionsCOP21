@@ -1,9 +1,4 @@
 
-body {
-   background-image:         url(background.jpg);
-   background-repeat:        repeat;
-}
-
 .logo {
    position:                 fixed;
 }
@@ -30,8 +25,9 @@ body {
    stroke-width:             2px;
 }
 
-#dot{
-   r:                        15px;
-   stroke:                   #ffffff;
+.mote{
+   r:                        100px;
+   stroke:                   #000000;
    stroke-width:             2px;
+   fill:                     #ff0000;
 }
