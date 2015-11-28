@@ -44,6 +44,8 @@ var positions      = {
     '00-17-0d-00-00-dd-dd-dd': [0.95,0.60],      // position 13
     '00-17-0d-00-00-ee-ee-ee': [0.95,0.80]       // position 14
 }
+var lastupdates    = {}
+var updatestate    = {}
 
 //=========================== admin ===========================================
 
@@ -116,6 +118,21 @@ function refreshDashboard() {
 }
 function refreshDashboard_cb(newData) {
     for (var mac in newData.temperature) {
-        $('#'+mac+'_text').text(newData.temperature[mac]+'C');
+        temperature = newData.temperature[mac][0];
+        lastupdate  = newData.temperature[mac][1];
+        $('#'+mac+'_text').text(temperature+'C');
+        if (!(mac in lastupdates) || (lastupdates[mac]!=lastupdate)) {
+            if (!(mac in updatestate)) {
+                updatestate[mac] = 0;
+            }
+            if (updatestate[mac]==0) {
+                $('#'+mac+'_circle').css('fill',"#ff0000");
+                updatestate[mac]=1;
+            } else {
+                $('#'+mac+'_circle').css('fill',"#00ff00");
+                updatestate[mac]=0;
+            }
+        }
+        lastupdates[mac] = lastupdate;
     }
 }

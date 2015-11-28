@@ -93,7 +93,7 @@ class AppData(object):
             return self.data['mac'][id]
     def setTemperature(self,mac,temperature):
         with self.dataLock:
-            self.data['temperature'][mac]   = temperature
+            self.data['temperature'][mac]   = [temperature,time.time()]
     def setNeighbors(self,mac,neighbors):
         with self.dataLock:
             self.data['neighbors'][mac]     = neighbors
