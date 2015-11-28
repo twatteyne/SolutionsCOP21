@@ -18,7 +18,8 @@ import bottle
 import json
 
 from SmartMeshSDK                      import HrParser,                   \
-                                              sdk_version
+                                              sdk_version,                \
+                                              FormatUtils
 from SmartMeshSDK.IpMgrConnectorSerial import IpMgrConnectorSerial
 from SmartMeshSDK.IpMgrConnectorMux    import IpMgrSubscribe
 from SmartMeshSDK.protocols.oap        import OAPDispatcher,              \
@@ -208,11 +209,11 @@ class Receiver(threading.Thread):
         
         try:
             assert notifName=='notifHealthReport'
-            mac    = notifParams.macAddress
+            mac    = FormatUtils.formatMacString(notifParams.macAddress)
             hr     = self.hrParser.parseHr(notifParams.payload)
             if 'Discovered' in hr:
                 neighbors = {}
-                for n in ht['Discovered']['discoveredNeighbors']:
+                for n in hr['Discovered']['discoveredNeighbors']:
                     try:
                         m = AppData().getMacFromId(n['neighborId'])
                     except Exception:
@@ -235,8 +236,9 @@ class Receiver(threading.Thread):
         try:
             if not isinstance(notif,OAPNotif.OAPTempSample):
                 return
-            temp = notif.samples[0]
-            print 'TODO OAP {0} {1}'.format(mac,temp)
+            mac  = FormatUtils.formatMacString(mac)
+            temp = float(notif.samples[0])/100.0
+            print 'TODO OAP {0} {1:.2f} C'.format(mac,temp)
         except Exception as err:
             criticalError(err)
 
