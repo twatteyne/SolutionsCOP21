@@ -20,6 +20,7 @@ import json
 from SmartMeshSDK                      import HrParser,                   \
                                               sdk_version,                \
                                               FormatUtils
+from SmartMeshSDK.ApiException         import APIError
 from SmartMeshSDK.IpMgrConnectorSerial import IpMgrConnectorSerial
 from SmartMeshSDK.IpMgrConnectorMux    import IpMgrSubscribe
 from SmartMeshSDK.protocols.oap        import OAPDispatcher,              \
@@ -72,11 +73,18 @@ class AppData(object):
         self._init      = True
         self.dataLock   = threading.RLock()
         self.data       = {
+            'connector':   None,
             'mac':         {},
             'temperature': {},
             'neighbors':   {},
         }
-    def setId(self,idMacMapping):
+    def setConnector(self,connector):
+        with self.dataLock:
+            self.data['connector']          = connector
+    def getConnector(self):
+        with self.dataLock:
+            return self.data['connector']
+    def setMac(self,idMacMapping):
         with self.dataLock:
             self.data['mac']                = idMacMapping
     def getMacFromId(self,id):
@@ -146,6 +154,7 @@ class Receiver(threading.Thread):
                 )
                 self.oap_dispatch = OAPDispatcher.OAPDispatcher()
                 self.oap_dispatch.register_notif_handler(self._handle_oap)
+                AppData().setConnector(self.connector)
             except Exception as err:
                 print 'FAIL:'
                 print err
@@ -245,9 +254,56 @@ class Receiver(threading.Thread):
                 return
             mac  = FormatUtils.formatMacString(mac)
             temp = float(notif.samples[0])/100.0
-            print 'TODO OAP {0} {1:.2f} C'.format(mac,temp)
+            AppData().setTemperature(mac,temp)
         except Exception as err:
             criticalError(err)
+
+class Snapshot(threading.Thread):
+    
+    SNAPSHOT_PERIOD    = 5 # seconds
+    
+    def __init__(self):
+        
+        # record params
+        
+        # initialize thread
+        threading.Thread.__init__(self)
+        self.name  = 'SnapShot'
+        self.start()
+    
+    def run(self):
+        try:
+            delay = 0
+            while True:
+                time.sleep(1)
+                if delay==0:
+                    self._doSnapshot()
+                    delay = self.SNAPSHOT_PERIOD
+                delay -= 1;
+        except Exception as err:
+            criticalError(err)
+    
+    def _doSnapshot(self):
+        try:
+            print "snapshot...",
+            macs = {}
+            connector = AppData().getConnector()
+            currentMac     = (0,0,0,0,0,0,0,0) # start getMoteConfig() iteration with the 0 MAC address
+            continueAsking = True
+            while continueAsking:
+                try:
+                    res = connector.dn_getMoteConfig(currentMac,True)
+                except APIError:
+                    continueAsking = False
+                else:
+                    macs[res.moteId] = FormatUtils.formatMacString(res.macAddress)
+                    currentMac = res.macAddress
+            AppData().setMac(macs)
+        except Exception as err:
+            print "FAIL:"
+            print err
+        else:
+            print "done."
 
 class WebInterface(threading.Thread):
     
@@ -310,6 +366,7 @@ def main():
     print 'SmartMesh SDK {0}\n'.format('.'.join([str(b) for b in sdk_version.VERSION]))
     
     receiver       = Receiver('COM9',simulation=False)
+    snapshot       = Snapshot()
     web            = WebInterface(receiver)
     
     raw_input("Press any key to stop.")
