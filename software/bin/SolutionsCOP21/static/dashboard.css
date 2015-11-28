@@ -14,20 +14,25 @@
 }
 
 .logo img {
-   top:                      0;
-   left:                     0;
-   outline:                  none;
-   border:                   0;
+    top:                     0;
+    left:                    0;
+    outline:                 none;
+    border:                  0;
 }
 
-.safezoneline{
-   stroke:                   #ffffff;
-   stroke-width:             2px;
+.motecircle{
+    r:                       44px;
+    stroke:                  #000000;
+    stroke-width:            2px;
+    fill:                    #ff0000;
 }
 
-.mote{
-   r:                        100px;
-   stroke:                   #000000;
-   stroke-width:             2px;
-   fill:                     #ff0000;
+.motetext{
+    text-align:              center;
+    position:                absolute;
+    width:                   88px;
+    height:                  88px;
+    font-size:               x-large;
+    font-family:             Lucida Console;
+    line-height:             4em;
 }

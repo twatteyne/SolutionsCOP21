@@ -9,6 +9,7 @@ var map_w          = 0;
 var map_h          = 0;
 var map_top        = 0;
 var map_left       = 0;
+var motesize       = 88;
 
 /*
   +-7-----8-+-9----10-+
@@ -28,7 +29,7 @@ var positions      = {
     '00-17-0d-00-00-38-06-ad': [0.40,0.89],      // position 1
     '00-17-0d-00-00-38-05-da': [0.20,0.89],      // position 2
     
-    '00-17-0d-00-00-33-33-33': [0.05,0.80],      // position 3
+    '00-17-0d-00-00-38-07-01': [0.05,0.80],      // position 3
     '00-17-0d-00-00-44-44-44': [0.05,0.60],      // position 4
     '00-17-0d-00-00-55-55-55': [0.05,0.40],      // position 5
     '00-17-0d-00-00-66-66-66': [0.05,0.20],      // position 6
@@ -47,23 +48,6 @@ var positions      = {
 //=========================== admin ===========================================
 
 function initDashboard() {
-    
-    //=== logo
-    
-    /*
-    $('\
-        <div id="logo" class="logo"> \
-            <img src="logo.png">\
-        </div>'
-    ).appendTo('#dashboard');
-    $('#logo').offset(
-        {
-            top:  $(window).height()-61-20,
-            left: $(window).width()-200-20
-        }
-    );
-    $('#logo').css('z-index',-1);
-    */
     
     //=== map
     
@@ -93,7 +77,7 @@ function initDashboard() {
     
     svgText        = '<svg id="dashboardcanvas" xmlns="http://www.w3.org/2000/svg">'
     for (var mac in positions) {
-        svgText   += '<circle id="'+mac+'_circle" class="mote"></circle>';
+        svgText   += '<circle id="'+mac+'_circle" class="motecircle"></circle>';
     }
     svgText       += '</svg>'
     $(svgText).appendTo('#dashboard');
@@ -115,8 +99,10 @@ function initDashboard() {
             'cx':      positions[mac][0]*map_w,
             'cy':      positions[mac][1]*map_h
         });
-        $('#'+mac).css({
-            'z-index': -1
+        $('<div id="'+mac+'_text" class="motetext"/>').appendTo('#dashboard');
+        $('#'+mac+'_text').css({
+            'left':     map_left+positions[mac][0]*map_w-motesize/2,
+            'top':      map_top+positions[mac][1]*map_h-motesize/2
         });
     }
 }
@@ -129,41 +115,7 @@ function refreshDashboard() {
    getNewDashboardData();
 }
 function refreshDashboard_cb(newData) {
-    
-    /*
-    // filter cases when I don't need to update
-    if (newData['calibrated']==false) {
-        return;
+    for (var mac in newData.temperature) {
+        $('#'+mac+'_text').text(newData.temperature[mac]+'C');
     }
-    if (newData['lastUpdate']==lastUpdate) {
-        return;
-    }
-    
-    // remember when I updated last
-    lastUpdate = newData['lastUpdate'];
-    
-    // toggle color dot
-    if ($('#dot').attr('fill')=="#de9118") {
-        $('#dot').attr('fill',"#ffa71c");
-    } else {
-        $('#dot').attr('fill',"#de9118");
-    }
-    
-    // reposition dot
-    $('#dot').attr({
-        'cx':      safezone_cx+safezone_r*newData['radius']*Math.sin(newData['heading']),
-        'cy':      safezone_cy-safezone_r*newData['radius']*Math.cos(newData['heading'])
-    });
-    
-    // warn if radius too large
-    if (newData['radius']>1.0) {
-        $('#safezone').attr('fill',"#ff0000");
-        var audio = new Audio('sound.mp3');
-        audio.play();
-    } else {
-        $('#safezone').attr('fill',"#5ea00f");
-    }
-    */
-    // log
-    console.log(newData);
 }
