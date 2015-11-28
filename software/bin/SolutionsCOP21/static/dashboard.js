@@ -100,7 +100,8 @@ function initDashboard() {
     for (var mac in positions) {
         $('#'+mac+'_circle').attr({
             'cx':      positions[mac][0]*map_w,
-            'cy':      positions[mac][1]*map_h
+            'cy':      positions[mac][1]*map_h,
+            'r':       44
         });
         $('<div id="'+mac+'_text" class="motetext" style="z-index:4"/>').appendTo('#dashboard');
         $('#'+mac+'_text').css({
