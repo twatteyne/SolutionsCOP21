@@ -75,7 +75,7 @@ class AppData(object):
         self.dataLock   = threading.RLock()
         self.data       = {
             'connector':   None,
-            'mac':         {},
+            'idToMac':     {},
             'temperature': {},
             'neighbors':   {},
         }
@@ -85,24 +85,23 @@ class AppData(object):
     def getConnector(self):
         with self.dataLock:
             return self.data['connector']
-    def setMac(self,idMacMapping):
+    def setIdToMac(self,idToMac):
         with self.dataLock:
-            self.data['mac']                = idMacMapping
+            self.data['idToMac']            = idToMac
     def getMacFromId(self,id):
         with self.dataLock:
-            return self.data['mac'][id]
+            return self.data['idToMac'][id]
     def setTemperature(self,mac,temperature):
         with self.dataLock:
             self.data['temperature'][mac]   = [temperature,time.time()]
-    def setNeighbors(self,mac,neighbors):
+    def setPaths(self,paths):
         with self.dataLock:
-            self.data['neighbors'][mac]     = neighbors
-            print self.data['neighbors']
+            self.data['paths']     = paths
     def get(self):
         with self.dataLock:
             return {
                 'temperature': copy.deepcopy(self.data['temperature']),
-                'neighbors':   copy.deepcopy(self.data['neighbors']),
+                'paths':       copy.deepcopy(self.data['paths']),
             }
 
 class Receiver(threading.Thread):
@@ -140,13 +139,6 @@ class Receiver(threading.Thread):
                                         IpMgrSubscribe.IpMgrSubscribe.FINISH,
                                     ],
                     fun =           self._handle_ErrorFinish,
-                    isRlbl =        True,
-                )
-                subscriber.subscribe(
-                    notifTypes =    [
-                                        IpMgrSubscribe.IpMgrSubscribe.NOTIFHEALTHREPORT,
-                                    ],
-                    fun =           self._handle_HealthReport,
                     isRlbl =        True,
                 )
                 subscriber.subscribe(
@@ -194,56 +186,6 @@ class Receiver(threading.Thread):
         except Exception as err:
             logCrash(self.name,err)
     
-    def _handle_HealthReport(self,notifName, notifParams):
-        
-        '''
-        {
-            'Device': {
-                'batteryVoltage': 3058,
-                'temperature': 23,
-                'numRxLost': 0,
-                'numTxFai': 0,
-                'queueOcc': 33,
-                'charge': 801,
-                'numRxOk': 0,
-                'numTxOk': 32,
-                'badLinkSlot': 0,
-                'numMacDropped': 0,
-                'badLinkOffset': 0,
-                'numTxBad': 0,
-                'badLinkFrameId': 0,
-            },
-            'Discovered': {
-                'discoveredNeighbors': [
-                    {
-                        'rssi': -11,
-                        'numRx': 1,
-                        'neighborId': 2
-                    }
-                ],
-                'numItems':       1,
-                'numJoinParents': 1,
-            }
-        }
-        '''
-        
-        try:
-            assert notifName=='notifHealthReport'
-            mac    = FormatUtils.formatMacString(notifParams.macAddress)
-            hr     = self.hrParser.parseHr(notifParams.payload)
-            if 'Discovered' in hr:
-                neighbors = {}
-                for n in hr['Discovered']['discoveredNeighbors']:
-                    try:
-                        m = AppData().getMacFromId(n['neighborId'])
-                    except Exception:
-                        continue
-                    r = n['rssi']
-                    neighbors[m] = r
-                AppData().setNeighbors(mac,neighbors)
-        except Exception as err:
-            criticalError(err)
-    
     def _handle_data(self,notifName, notifParams):
         
         try:
@@ -290,19 +232,39 @@ class Snapshot(threading.Thread):
     def _doSnapshot(self):
         try:
             print "snapshot...",
-            macs = {}
-            connector = AppData().getConnector()
-            currentMac     = (0,0,0,0,0,0,0,0) # start getMoteConfig() iteration with the 0 MAC address
-            continueAsking = True
+            idToMac          = {}
+            macs             = []
+            connector        = AppData().getConnector()
+            currentMac       = (0,0,0,0,0,0,0,0)
+            continueAsking   = True
             while continueAsking:
                 try:
                     res = connector.dn_getMoteConfig(currentMac,True)
                 except APIError:
                     continueAsking = False
                 else:
-                    macs[res.moteId] = FormatUtils.formatMacString(res.macAddress)
-                    currentMac = res.macAddress
-            AppData().setMac(macs)
+                    idToMac[res.moteId] = FormatUtils.formatMacString(res.macAddress)
+                    currentMac    = res.macAddress
+                    macs         += [currentMac]
+            AppData().setIdToMac(idToMac)
+            paths = []
+            for mac in macs:
+                currentPathId  = 0
+                continueAsking = True
+                while continueAsking:
+                    try:
+                        res = connector.dn_getNextPathInfo(mac,0,currentPathId)
+                    except APIError:
+                        continueAsking = False
+                    else:
+                        currentPathId  = res.pathId
+                        paths += [
+                            (
+                                FormatUtils.formatMacString(res.source),
+                                FormatUtils.formatMacString(res.dest),
+                            )
+                        ]
+            AppData().setPaths(paths)
         except Exception as err:
             print "FAIL:"
             print err
