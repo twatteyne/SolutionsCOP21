@@ -17,6 +17,7 @@ import traceback
 import bottle
 import json
 import copy
+import requests
 
 from SmartMeshSDK                      import HrParser,                   \
                                               sdk_version,                \
@@ -268,6 +269,61 @@ class Snapshot(threading.Thread):
             print "snapshort FAILED:"
             print err
 
+class Xively(threading.Thread):
+    
+    SYNC_PERIOD    = 10 # seconds
+    
+    def __init__(self):
+        
+        # record params
+        
+        # initialize thread
+        threading.Thread.__init__(self)
+        self.name  = 'Xively'
+        self.start()
+    
+    def run(self):
+        try:
+            delay = 0
+            while True:
+                time.sleep(1)
+                if delay==0:
+                    self._syncToXively()
+                    delay = self.SYNC_PERIOD
+                delay -= 1;
+        except Exception as err:
+            criticalError(err)
+    
+    def _syncToXively(self):
+        try:
+            rawData          = AppData().get()
+            xivelyData       = []
+            for (m,[t,ts]) in rawData['temperature'].items():
+                xivelyData  += ['{0}:{1}'.format(m,t)]
+            xivelyData       = "_".join(xivelyData)
+            print xivelyData
+            r = requests.put(
+                "https://api.xively.com/v2/feeds/918651241",
+                headers = {
+                    "Host":                  "api.xively.com",
+                    "X-ApiKey":              "VALDxWNsi0roJQNtrFmCB3mBRBNgqeOAMlag1VcvkAd7peKp"
+                },
+                json = {
+                    "version":               "1.0.0",
+                    "datastreams": [
+                        {
+                            "id":            "temp",
+                            "current_value": xivelyData,
+                        },
+                    ]
+                },
+            )
+        except Exception as err:
+            print "syncing to Xively FAILED:"
+            print err
+        else:
+            print "Xively response: {0}".format(r.status_code)
+
 class WebInterface(threading.Thread):
     
     def __init__(self,receiver):
@@ -328,6 +384,7 @@ def main():
     
     receiver       = Receiver('COM9',simulation=False)
     snapshot       = Snapshot()
+    xilvey         = Xively()
     web            = WebInterface(receiver)
     
     raw_input("Press any key to stop.")
