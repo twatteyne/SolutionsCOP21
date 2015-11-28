@@ -77,7 +77,7 @@ class AppData(object):
             'connector':   None,
             'idToMac':     {},
             'temperature': {},
-            'neighbors':   {},
+            'paths':       {},
         }
     def setConnector(self,connector):
         with self.dataLock:
@@ -206,7 +206,7 @@ class Receiver(threading.Thread):
 
 class Snapshot(threading.Thread):
     
-    SNAPSHOT_PERIOD    = 5 # seconds
+    SNAPSHOT_PERIOD    = 60 # seconds
     
     def __init__(self):
         
@@ -231,7 +231,6 @@ class Snapshot(threading.Thread):
     
     def _doSnapshot(self):
         try:
-            print "snapshot...",
             idToMac          = {}
             macs             = []
             connector        = AppData().getConnector()
@@ -266,10 +265,8 @@ class Snapshot(threading.Thread):
                         ]
             AppData().setPaths(paths)
         except Exception as err:
-            print "FAIL:"
+            print "snapshort FAILED:"
             print err
-        else:
-            print "done."
 
 class WebInterface(threading.Thread):
     
