@@ -16,6 +16,7 @@ import threading
 import traceback
 import bottle
 import json
+import copy
 
 from SmartMeshSDK                      import HrParser,                   \
                                               sdk_version,                \
@@ -97,9 +98,12 @@ class AppData(object):
         with self.dataLock:
             self.data['neighbors'][mac]     = neighbors
             print self.data['neighbors']
-    def get(self,name):
+    def get(self):
         with self.dataLock:
-            return self.data[name]
+            return {
+                'temperature': copy.deepcopy(self.data['temperature']),
+                'neighbors':   copy.deepcopy(self.data['neighbors']),
+            }
 
 class Receiver(threading.Thread):
     
@@ -348,9 +352,7 @@ class WebInterface(threading.Thread):
     
     def _cb_data_GET(self):
         return json.dumps(
-            {
-                'poipoi':    True,
-            }
+            AppData().get()
         )
         
     def _cb_root_GET(self):
