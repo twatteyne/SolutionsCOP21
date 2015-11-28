@@ -13,27 +13,20 @@ if __name__ == "__main__":
 import sys
 import time
 import threading
-import struct
-import math
 import traceback
-import Tkinter
-import winsound
 import bottle
 import json
-import random
-import requests
 
-from SmartMeshSDK                       import sdk_version
-from SmartMeshSDK.IpMgrConnectorSerial  import IpMgrConnectorSerial
-from SmartMeshSDK.IpMgrConnectorMux     import IpMgrSubscribe
+from SmartMeshSDK                      import HrParser,                   \
+                                              sdk_version
+from SmartMeshSDK.IpMgrConnectorSerial import IpMgrConnectorSerial
+from SmartMeshSDK.IpMgrConnectorMux    import IpMgrSubscribe
+from SmartMeshSDK.protocols.oap        import OAPDispatcher,              \
+                                              OAPClient,                  \
+                                              OAPMessage,                 \
+                                              OAPNotif
 
 #============================ helpers =========================================
-
-def radToDeg(rad):
-    return rad*57.3
-
-def degToRad(rad):
-    return rad/57.3
 
 def printDebug(stringToPrint):
     #print stringToPrint
@@ -65,84 +58,188 @@ def criticalError(err):
 
 #============================ classes =========================================
 
-class Receiver(object):
+class AppData(object):
+    _instance = None
+    _init     = False
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(AppData,cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+    def __init__(self):
+        if self._init:
+            return
+        self._init      = True
+        self.dataLock   = threading.RLock()
+        self.data       = {
+            'temperature': {},
+            'neighbors':   {},
+        }
+    def setTemperature(self,mac,temperature):
+        with self.dataLock:
+            self.data['temperature'][mac] = temperature
+    def setNeighbors(self,mac,neighbors):
+        with self.dataLock:
+            self.data['neighbors'][mac]   = neighbors
+            print self.data['neighbors']
+    def get(self,name):
+        with self.dataLock:
+            return self.data[name]
+
+class Receiver(threading.Thread):
     
-    def __init__(self,comPort,simulation=False):
+    def __init__(self,serialPort,simulation=False):
         
         # store params
-        self.comPort    = comPort
-        self.simulation = simulation
+        self.serialPort         = serialPort
+        self.simulation      = simulation
         
         # local variables
-        self.dataLock   = threading.RLock(0)
-        if not self.simulation:
-            self.connector  = IpMgrConnectorSerial.IpMgrConnectorSerial()
-            self.connector.connect({'port': self.comPort})
-            self.subscriber = IpMgrSubscribe.IpMgrSubscribe(self.connector)
-            self.subscriber.start()
-            self.subscriber.subscribe(
-                notifTypes  =   [
-                                    IpMgrSubscribe.IpMgrSubscribe.NOTIFDATA,
-                                ],
-                fun =           self._handle_data,
-                isRlbl =        False,
-            )
+        self.dataLock        = threading.RLock(0)
+        self.goOn            = True
+        self.hrParser        = HrParser.HrParser()
+        self.reconnectEvent  = threading.Event()
+        
+        # initialize thread
+        threading.Thread.__init__(self)
+        self.name            = 'Receiver'
+        self.start()
+    
+    def run(self):
+        
+        while self.goOn:
+            
+            try:
+                print 'Connecting to {0}...'.format(self.serialPort),
+                self.connector    = IpMgrConnectorSerial.IpMgrConnectorSerial()
+                self.connector.connect({'port': self.serialPort})
+                subscriber   = IpMgrSubscribe.IpMgrSubscribe(self.connector)
+                subscriber.start()
+                subscriber.subscribe(
+                    notifTypes =    [
+                                        IpMgrSubscribe.IpMgrSubscribe.ERROR,
+                                        IpMgrSubscribe.IpMgrSubscribe.FINISH,
+                                    ],
+                    fun =           self._handle_ErrorFinish,
+                    isRlbl =        True,
+                )
+                subscriber.subscribe(
+                    notifTypes =    [
+                                        IpMgrSubscribe.IpMgrSubscribe.NOTIFHEALTHREPORT,
+                                    ],
+                    fun =           self._handle_HealthReport,
+                    isRlbl =        True,
+                )
+                subscriber.subscribe(
+                    notifTypes    = [
+                                        IpMgrSubscribe.IpMgrSubscribe.NOTIFDATA,
+                                    ],
+                    fun =           self._handle_data,
+                    isRlbl =        False,
+                )
+                self.oap_dispatch = OAPDispatcher.OAPDispatcher()
+                self.oap_dispatch.register_notif_handler(self._handle_oap)
+            except Exception as err:
+                print 'FAIL:'
+                print err
+                time.sleep(1)
+            else:
+                print 'PASS.'
+                self.reconnectEvent.clear()
+                self.reconnectEvent.wait()
+            finally:
+                try:
+                    self.connector.disconnect()
+                except:
+                    pass
     
     #======================== public
     
     def close(self):
-        self.connector.disconnect()
+        try:
+            self.connector.disconnect()
+        except:
+            pass
     
     #======================== private
+    
+    def _handle_ErrorFinish(self,notifName,notifParams):
+        try:
+            assert notifName in [
+                IpMgrSubscribe.IpMgrSubscribe.ERROR,
+                IpMgrSubscribe.IpMgrSubscribe.FINISH,
+            ]
+            if not self.reconnectEvent.isSet():
+                self.reconnectEvent.set()
+        except Exception as err:
+            logCrash(self.name,err)
+    
+    def _handle_HealthReport(self,notifName, notifParams):
+        
+        '''
+        {
+            'Device': {
+                'batteryVoltage': 3058,
+                'temperature': 23,
+                'numRxLost': 0,
+                'numTxFai': 0,
+                'queueOcc': 33,
+                'charge': 801,
+                'numRxOk': 0,
+                'numTxOk': 32,
+                'badLinkSlot': 0,
+                'numMacDropped': 0,
+                'badLinkOffset': 0,
+                'numTxBad': 0,
+                'badLinkFrameId': 0,
+            },
+            'Discovered': {
+                'discoveredNeighbors': [
+                    {
+                        'rssi': -11,
+                        'numRx': 1,
+                        'neighborId': 2
+                    }
+                ],
+                'numItems':       1,
+                'numJoinParents': 1,
+            }
+        }
+        '''
+        
+        try:
+            assert notifName=='notifHealthReport'
+            mac    = notifParams.macAddress
+            hr     = self.hrParser.parseHr(notifParams.payload)
+            if 'Discovered' in hr:
+                neighbors = {}
+                for n in ht['Discovered']['discoveredNeighbors']:
+                    try:
+                        m = AppData().getMacFromId(n['neighborId'])
+                    except Exception:
+                        continue
+                    r = n['rssi']
+                    neighbors[m] = r
+                AppData().setNeighbors(mac,neighbors)
+        except Exception as err:
+            criticalError(err)
     
     def _handle_data(self,notifName, notifParams):
         
         try:
             assert notifName=='notifData'
-            
-            print "TODO _handle_data"
-            print notifParams
-        
+            self.oap_dispatch.dispatch_pkt(notifName, notifParams)
+        except Exception as err:
+            criticalError(err)
+    
+    def _handle_oap(self,mac,notif):
+        try:
+            if not isinstance(notif,OAPNotif.OAPTempSample):
+                return
+            temp = notif.samples[0]
+            print 'TODO OAP {0} {1}'.format(mac,temp)
         except Exception as err:
             criticalError(err)
 
-class Snapshot(threading.Thread):
-    
-    SNAPSHOT_PERIOD    = 5 # seconds
-    
-    def __init__(self,receiver):
-        
-        # record params
-        self.receiver = receiver
-        
-        # initialize the parent class
-        threading.Thread.__init__(self)
-        
-        # start myself
-        self.start()
-    
-    def run(self):
-        
-        try:
-            
-            delay = 0
-            
-            while True:
-                # wait before getting data
-                time.sleep(1)
-                
-                if delay==0:
-                    self._doSnapshot()
-                    delay = SNAPSHOT_PERIOD
-                
-                delay -= 1;
-        
-        except Exception as err:
-            criticalError(err)
-    
-    def _doSnapshot(self):
-        print "TODO _doSnapshot"
-    
 class WebInterface(threading.Thread):
     
     def __init__(self,receiver):
@@ -204,7 +301,6 @@ def main():
     print 'SmartMesh SDK {0}\n'.format('.'.join([str(b) for b in sdk_version.VERSION]))
     
     receiver       = Receiver('COM9',simulation=False)
-    snapshot       = Snapshot(receiver)
     web            = WebInterface(receiver)
     
     raw_input("Press any key to stop.")
