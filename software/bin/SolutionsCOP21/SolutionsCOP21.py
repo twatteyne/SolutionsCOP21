@@ -72,15 +72,22 @@ class AppData(object):
         self._init      = True
         self.dataLock   = threading.RLock()
         self.data       = {
+            'mac':         {},
             'temperature': {},
             'neighbors':   {},
         }
+    def setId(self,idMacMapping):
+        with self.dataLock:
+            self.data['mac']                = idMacMapping
+    def getMacFromId(self,id):
+        with self.dataLock:
+            return self.data['mac'][id]
     def setTemperature(self,mac,temperature):
         with self.dataLock:
-            self.data['temperature'][mac] = temperature
+            self.data['temperature'][mac]   = temperature
     def setNeighbors(self,mac,neighbors):
         with self.dataLock:
-            self.data['neighbors'][mac]   = neighbors
+            self.data['neighbors'][mac]     = neighbors
             print self.data['neighbors']
     def get(self,name):
         with self.dataLock:
