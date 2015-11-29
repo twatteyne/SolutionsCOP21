@@ -14,7 +14,7 @@ function xively_cb(xivelyData) {
     tempPerMote    = xivelyData['datastreams'][0]['current_value'].split('_')
     temperature    = {}
     for (var i=0;i<tempPerMote.length;i++) {
-        mac        = tempPerMote[i].split(':')[0]
+        mac        = '00-17-0d-00-00-'+tempPerMote[i].split(':')[0]
         temp       = tempPerMote[i].split(':')[1]
         temperature[mac] = [temp,ts]
     }

@@ -18,6 +18,7 @@ import bottle
 import json
 import copy
 import requests
+import random
 
 from SmartMeshSDK                      import HrParser,                   \
                                               sdk_version,                \
@@ -266,7 +267,7 @@ class Snapshot(threading.Thread):
                         ]
             AppData().setPaths(paths)
         except Exception as err:
-            print "snapshort FAILED:"
+            print "snapshot FAILED:"
             print err
 
 class Xively(threading.Thread):
@@ -299,9 +300,12 @@ class Xively(threading.Thread):
             rawData          = AppData().get()
             xivelyData       = []
             for (m,[t,ts]) in rawData['temperature'].items():
-                xivelyData  += ['{0}:{1}'.format(m,t)]
+                xivelyData  += ['{0}:{1}'.format(m[-8:],t)]
+            '''
+            for m in ['44','55','66','77','88','99','aa','bb','cc','dd','ee']:
+                xivelyData  += ['{0}-{0}-{0}:{1:.02f}'.format(m,30*random.random())]
+            '''
             xivelyData       = "_".join(xivelyData)
-            print xivelyData
             r = requests.put(
                 "https://api.xively.com/v2/feeds/918651241",
                 headers = {
